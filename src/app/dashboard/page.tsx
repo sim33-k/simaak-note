@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
+import CreateNoteDialog from '@/components/CreateNoteDialog'
 import { UserButton } from '@clerk/nextjs'
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
@@ -38,6 +39,14 @@ const DashboardPage = (props: Props) => {
                 <h2 className='text-2xl font-bold text-gray-900'>No notes found</h2>
                 <p className='text-gray-500'>Create a note to get started</p>
                 <Button className='bg-[#F74851] mt-4'>Create Note</Button>
+            </div>
+
+
+            {/* All the notes here */}
+
+            <div className='grid sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-1 gap-3'>
+                {/* Note card */}
+                <CreateNoteDialog/>
             </div>
 
         </div>
