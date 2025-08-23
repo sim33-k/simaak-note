@@ -7,22 +7,32 @@ import { Button } from "./ui/button";
 import { useMutation } from "@tanstack/react-query";
 import axios from "axios";
 import { NoteType } from "@/lib/db/schema";
+import { useDebounce } from "@/lib/useDebounce";
 
 type Props = { note: NoteType };
 
 const TipTapEditor = ({ note }: Props) => {
-  const [editorState, setEditorState] = React.useState(
-    note.editorState || `<h1>${note.name}</h1>`
-  );
+  const [editorState, setEditorState] = React.useState(() => {
+    // Check if editorState is valid HTML content, not just "{}" or empty
+    if (note.editorState && note.editorState !== "{}" && note.editorState.trim() !== "") {
+      return note.editorState;
+    }
+    return `<h1>${note.name}</h1>`;
+  });
+  
+  const hasInitialized = React.useRef(false);
+  const lastSavedContent = React.useRef(editorState);
+  
   const saveNote = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (content: string) => {
       const response = await axios.post("/api/saveNote", {
         noteId: note.id,
-        editorState,
+        editorState: content,
       });
       return response.data;
     },
   });
+  
   const editor = useEditor({
     autofocus: true,
     extensions: [StarterKit],
@@ -33,10 +43,30 @@ const TipTapEditor = ({ note }: Props) => {
     },
   });
 
+  const debouncedEditorState = useDebounce(editorState, 1000)
+  
   React.useEffect(() => {
-    // save to db
-    if (editorState === "") return;
-    saveNote.mutate(undefined, {
+    // Skip initial render
+    if (!hasInitialized.current) {
+      hasInitialized.current = true;
+      lastSavedContent.current = debouncedEditorState;
+      return;
+    }
+    
+    // Skip if content hasn't changed
+    if (debouncedEditorState === lastSavedContent.current) {
+      return;
+    }
+    
+    // Skip if it's empty or just the default heading
+    if (debouncedEditorState === "" || debouncedEditorState === `<h1>${note.name}</h1>`) {
+      return;
+    }
+    
+    console.log("Saving note:", debouncedEditorState);
+    lastSavedContent.current = debouncedEditorState;
+    
+    saveNote.mutate(debouncedEditorState, {
       onSuccess: (data) => {
         console.log("success update!", data);
       },
@@ -44,7 +74,7 @@ const TipTapEditor = ({ note }: Props) => {
         console.error(err);
       },
     });
-  }, [editorState, saveNote]);
+  }, [debouncedEditorState, saveNote, note.name]);
 
   return (
     <>
