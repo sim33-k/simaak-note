@@ -22,6 +22,7 @@ const DeleteButton = ({ noteId }: Props) => {
   });
   return (
     <Button
+      className="bg-[#F74851]"
       variant={"destructive"}
       size="sm"
       disabled={deleteNote.isPending}
