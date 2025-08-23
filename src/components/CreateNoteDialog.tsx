@@ -2,23 +2,48 @@
 import React from 'react'
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog'
 import { Button } from './ui/button'
-import { Plus } from 'lucide-react'
+import { Loader2, Plus } from 'lucide-react'
 import { Input } from './ui/input'
-
+import { useMutation } from '@tanstack/react-query'
+import axios from 'axios'
+import { useRouter } from 'next/navigation'
+  
 type Props = {}
 
 const CreateNoteDialog = (props: Props) => {
     const [input, setInput] = React.useState('')
     const [isOpen, setIsOpen] = React.useState(false)
+    const createNoteBook = useMutation({
+        mutationFn: async () => {
+            const response = await axios.post('/api/createNoteBook', {
+                name: input
+            })
+            return response.data
+        }
+    })
+
+    const router = useRouter()
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault()
-        if (input.trim()) {
-            // TODO: Handle note creation
-            console.log('Creating note:', input)
-            setInput('')
-            setIsOpen(false)
+        if(input.trim() === '') {
+            window.alert('Please enter a note name')
+            return
         }
+        createNoteBook.mutate(undefined, {
+            onSuccess: ({note_id}) => {
+                console.log(`created note with id ${note_id}`)
+                setInput('')
+                setIsOpen(false)
+                router.push(`/notebook/${note_id}`)
+            },
+            onError: (error) => {
+                console.log('Error creating note', error)
+                window.alert('Error creating note')
+                setInput('')
+                setIsOpen(false)
+            }
+        })
     }
 
     const handleCancel = () => {
@@ -51,15 +76,15 @@ const CreateNoteDialog = (props: Props) => {
                         autoFocus
                     />
                     <div className="flex items-center gap-2 justify-end">
-                        <Button type='button' variant='secondary' onClick={handleCancel}>
+                        <Button type='button' variant='secondary' onClick={handleCancel} disabled={createNoteBook.isPending}>
                             Cancel
                         </Button>
                         <Button 
                             className='bg-[#F74851] hover:bg-[#F74851]/90' 
                             type='submit' 
-                            disabled={!input.trim()}
+                            disabled={!input.trim() || createNoteBook.isPending}
                         >
-                            Create Note
+                            {createNoteBook.isPending ? <Loader2 className='w-4 h-4 animate-spin' /> : 'Create Note'}
                         </Button>
                     </div>
                 </form>
