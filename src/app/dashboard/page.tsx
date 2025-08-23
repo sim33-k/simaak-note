@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button'
+import { Separator } from '@/components/ui/separator'
 import { UserButton } from '@clerk/nextjs'
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
@@ -25,6 +26,18 @@ const DashboardPage = (props: Props) => {
                     <UserButton/>
 
                 </div>
+            </div>
+
+            <div className="h-8"></div>
+            <Separator/>
+
+            <div className="h-8"></div>
+            {/* im going to add the notes here */}
+
+            <div className='text-center'>
+                <h2 className='text-2xl font-bold text-gray-900'>No notes found</h2>
+                <p className='text-gray-500'>Create a note to get started</p>
+                <Button className='bg-[#F74851] mt-4'>Create Note</Button>
             </div>
 
         </div>
