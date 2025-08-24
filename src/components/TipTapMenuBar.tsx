@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 
 const TipTapMenuBar = ({ editor }: { editor: Editor }) => {
+  console.log("TipTapMenuBar rendering, editor:", editor);
   return (
     <div className="flex flex-wrap gap-2">
       <button
@@ -50,19 +51,31 @@ const TipTapMenuBar = ({ editor }: { editor: Editor }) => {
         <Code className="w-6 h-6" />
       </button>
       <button
-        onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+        onClick={() => {
+          console.log("H1 clicked");
+          editor.chain().focus().toggleHeading({ level: 1 }).run();
+        }}
+        disabled={!editor.can().chain().focus().toggleHeading({ level: 1 }).run()}
         className={editor.isActive("heading", { level: 1 }) ? "is-active" : ""}
       >
         <Heading1 className="w-6 h-6" />
       </button>
       <button
-        onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+        onClick={() => {
+          console.log("H2 clicked");
+          editor.chain().focus().toggleHeading({ level: 2 }).run();
+        }}
+        disabled={!editor.can().chain().focus().toggleHeading({ level: 2 }).run()}
         className={editor.isActive("heading", { level: 2 }) ? "is-active" : ""}
       >
         <Heading2 className="w-6 h-6" />
       </button>
       <button
-        onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+        onClick={() => {
+          console.log("H3 clicked");
+          editor.chain().focus().toggleHeading({ level: 3 }).run();
+        }}
+        disabled={!editor.can().chain().focus().toggleHeading({ level: 3 }).run()}
         className={editor.isActive("heading", { level: 3 }) ? "is-active" : ""}
       >
         <Heading3 className="w-6 h-6" />
