@@ -29,6 +29,19 @@ const TipTapEditor = ({ note }: Props) => {
 
   const [completion, setCompletion] = React.useState("");
   const [errorMessage, setErrorMessage] = React.useState("");
+  
+  const hasInitialized = React.useRef(false);
+  const lastSavedContent = React.useRef(editorState);
+  
+  const saveNote = useMutation({
+    mutationFn: async (content: string) => {
+      const response = await axios.post("/api/saveNote", {
+        noteId: note.id,
+        editorState: content,
+      });
+      return response.data;
+    },
+  });
 
   // Handle streaming AI completion
   const handleCompletion = React.useCallback(async (prompt: string) => {
@@ -85,6 +98,40 @@ const TipTapEditor = ({ note }: Props) => {
     }
   }, [editor]);
 
+  const debouncedEditorState = useDebounce(editorState, 1000);
+  
+  // Auto-save when content changes
+  React.useEffect(() => {
+    // Skip initial render
+    if (!hasInitialized.current) {
+      hasInitialized.current = true;
+      lastSavedContent.current = debouncedEditorState;
+      return;
+    }
+    
+    // Skip if content hasn't changed
+    if (debouncedEditorState === lastSavedContent.current) {
+      return;
+    }
+    
+    // Skip if it's empty or just the default heading
+    if (debouncedEditorState === "" || debouncedEditorState === `<h1>${note.name}</h1>`) {
+      return;
+    }
+    
+    console.log("Saving note:", debouncedEditorState);
+    lastSavedContent.current = debouncedEditorState;
+    
+    saveNote.mutate(debouncedEditorState, {
+      onSuccess: (data) => {
+        console.log("success update!", data);
+      },
+      onError: (err) => {
+        console.error(err);
+      },
+    });
+  }, [debouncedEditorState, saveNote, note.name]);
+
   // Handle Shift+A for autocomplete
   React.useEffect(() => {
     if (!editor) return;
@@ -126,7 +173,7 @@ const TipTapEditor = ({ note }: Props) => {
       <div className="flex items-center gap-2">
         {editor && <TipTapMenuBar editor={editor} />}
         <Button disabled variant={"outline"}>
-          Saved
+          {saveNote.isPending ? "Saving..." : "Saved"}
         </Button>
       </div>
 
