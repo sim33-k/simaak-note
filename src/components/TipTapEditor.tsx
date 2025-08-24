@@ -2,6 +2,7 @@
 import React from "react";
 import { EditorContent, useEditor } from "@tiptap/react";
 import { StarterKit } from "@tiptap/starter-kit";
+import Text from "@tiptap/extension-text";
 import TipTapMenuBar from "./TipTapMenuBar";
 import { Button } from "./ui/button";
 import { useMutation } from "@tanstack/react-query";
@@ -18,20 +19,12 @@ const TipTapEditor = ({ note }: Props) => {
       : `<h1>${note.name}</h1>`
   );
 
-  const editor = useEditor({
-    autofocus: true,
-    extensions: [StarterKit],
-    content: editorState,
-    onUpdate: ({ editor }) => setEditorState(editor.getHTML()),
-    // Add this to fix SSR hydration issue
-    immediatelyRender: false,
-  });
-
   const [completion, setCompletion] = React.useState("");
   const [errorMessage, setErrorMessage] = React.useState("");
   
   const hasInitialized = React.useRef(false);
   const lastSavedContent = React.useRef(editorState);
+  const lastCompletion = React.useRef("");
   
   const saveNote = useMutation({
     mutationFn: async (content: string) => {
@@ -78,27 +71,71 @@ const TipTapEditor = ({ note }: Props) => {
       let text = "";
       let chunkCount = 0;
 
-      while (!done) {
-        const { value, done: readerDone } = await reader.read();
-        done = readerDone;
-        if (value) {
-          chunkCount++;
-          const chunk = decoder.decode(value);
-          console.log(`Chunk ${chunkCount}:`, chunk);
-          text += chunk;
-          setCompletion(text); // update state
-          if (editor) editor.commands.insertContent(chunk); // insert live
-        }
-      }
+             while (!done) {
+         const { value, done: readerDone } = await reader.read();
+         done = readerDone;
+         if (value) {
+           chunkCount++;
+           const chunk = decoder.decode(value);
+           console.log(`Chunk ${chunkCount}:`, chunk);
+           text += chunk;
+           setCompletion(text);
+           
+           // Insert the chunk into the editor at cursor position
+           if (editor) {
+             editor.commands.insertContent(chunk);
+           }
+         }
+       }
       
       console.log("Stream completed. Total chunks:", chunkCount);
     } catch (err: any) {
       console.error("AI completion error:", err);
       setErrorMessage(err.message || "Unknown error");
     }
-  }, [editor]);
+  }, []);
 
-  const debouncedEditorState = useDebounce(editorState, 1000);
+  const editor = useEditor({
+    autofocus: true,
+    extensions: [StarterKit],
+    content: editorState,
+    onUpdate: ({ editor }) => setEditorState(editor.getHTML()),
+    // Add this to fix SSR hydration issue
+    immediatelyRender: false,
+  });
+
+  // Handle Shift+A for autocomplete
+  React.useEffect(() => {
+    if (!editor) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Check if the editor is focused
+      if (!editor.isFocused) return;
+      
+      if (e.shiftKey && e.key === "A") {
+        e.preventDefault();
+        
+        console.log("Shift+A detected, starting autocomplete...");
+        
+        const words = editor.getText().split(" ");
+        const last30 = words.slice(-30).join(" ");
+        
+        console.log("Last 30 words:", last30);
+        
+        handleCompletion(last30);
+      }
+    };
+
+    // Add event listener to the editor's DOM element instead of document
+    const editorElement = editor.view.dom;
+    editorElement.addEventListener("keydown", handleKeyDown);
+    
+    return () => {
+      editorElement.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [editor, handleCompletion]);
+
+  const debouncedEditorState = useDebounce(editorState, 500); // Using 500ms like File 2
   
   // Auto-save when content changes
   React.useEffect(() => {
@@ -132,38 +169,6 @@ const TipTapEditor = ({ note }: Props) => {
     });
   }, [debouncedEditorState, saveNote, note.name]);
 
-  // Handle Shift+A for autocomplete
-  React.useEffect(() => {
-    if (!editor) return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Check if the editor is focused
-      if (!editor.isFocused) return;
-      
-      if (e.shiftKey && e.key === "A") {
-        e.preventDefault();
-        
-        console.log("Shift+A detected, starting autocomplete...");
-        
-        const words = editor.getText().split(" ");
-        const last30 = words.slice(-30).join(" ");
-        
-        console.log("Last 30 words:", last30);
-        
-        handleCompletion(last30);
-      }
-    };
-
-    // Add event listener to the editor's DOM element instead of document
-    const editorElement = editor.view.dom;
-    editorElement.addEventListener("keydown", handleKeyDown);
-    
-    return () => {
-      editorElement.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [editor, handleCompletion]);
-
-  // Optional: show error above editor
   return (
     <>
       {errorMessage && (
@@ -180,6 +185,15 @@ const TipTapEditor = ({ note }: Props) => {
       <div className="prose prose-sm w-full mt-4">
         <EditorContent editor={editor} />
       </div>
+
+      <div className="h-4"></div>
+      <span className="text-sm">
+        Tip: Press{" "}
+        <kbd className="px-2 py-1.5 text-xs font-semibold text-gray-800 bg-gray-100 border border-gray-200 rounded-lg">
+          Shift + A
+        </kbd>{" "}
+        for AI autocomplete
+      </span>
     </>
   );
 };
