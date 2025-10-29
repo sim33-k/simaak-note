@@ -36,8 +36,19 @@ const TipTapEditor = ({ note }: Props) => {
     },
   });
 
+  const editor = useEditor({
+    autofocus: true,
+    extensions: [StarterKit],
+    content: editorState,
+    onUpdate: ({ editor }) => setEditorState(editor.getHTML()),
+    // Add this to fix SSR hydration issue
+    immediatelyRender: false,
+  });
+
   // Handle streaming AI completion
   const handleCompletion = React.useCallback(async (prompt: string) => {
+    if (!editor) return;
+    
     try {
       console.log("Starting completion request...");
       setErrorMessage("");
@@ -71,38 +82,27 @@ const TipTapEditor = ({ note }: Props) => {
       let text = "";
       let chunkCount = 0;
 
-             while (!done) {
-         const { value, done: readerDone } = await reader.read();
-         done = readerDone;
-         if (value) {
-           chunkCount++;
-           const chunk = decoder.decode(value);
-           console.log(`Chunk ${chunkCount}:`, chunk);
-           text += chunk;
-           setCompletion(text);
-           
-           // Insert the chunk into the editor at cursor position
-           if (editor) {
-             editor.commands.insertContent(chunk);
-           }
-         }
-       }
+      while (!done) {
+        const { value, done: readerDone } = await reader.read();
+        done = readerDone;
+        if (value) {
+          chunkCount++;
+          const chunk = decoder.decode(value);
+          console.log(`Chunk ${chunkCount}:`, chunk);
+          text += chunk;
+          setCompletion(text);
+          
+          // Insert the chunk into the editor at cursor position
+          editor.commands.insertContent(chunk);
+        }
+      }
       
       console.log("Stream completed. Total chunks:", chunkCount);
     } catch (err: any) {
       console.error("AI completion error:", err);
       setErrorMessage(err.message || "Unknown error");
     }
-  }, []);
-
-  const editor = useEditor({
-    autofocus: true,
-    extensions: [StarterKit],
-    content: editorState,
-    onUpdate: ({ editor }) => setEditorState(editor.getHTML()),
-    // Add this to fix SSR hydration issue
-    immediatelyRender: false,
-  });
+  }, [editor]);
 
   // Handle Shift+A for autocomplete
   React.useEffect(() => {
