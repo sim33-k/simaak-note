@@ -1,0 +1,1406 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[margin=1in]{geometry}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{tcolorbox}
+\usepackage{enumitem}
+
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{backcolour},   
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{magenta},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,         
+    breaklines=true,                 
+    captionpos=b,                    
+    keepspaces=true,                 
+    numbers=left,                    
+    numbersep=5pt,                  
+    showspaces=false,                
+    showstringspaces=false,
+    showtabs=false,                  
+    tabsize=2
+}
+
+\lstset{style=mystyle}
+
+\title{\textbf{AI-Powered Note-Taking App}\\
+\large Technical Documentation for Interns}
+\author{Development Team}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+\newpage
+
+
+\section{Introduction}
+
+Welcome to the AI-Powered Note-Taking App! This document will guide you through the architecture, key features, and implementation details of our application. By the end of this documentation, you'll understand how all the pieces fit together.
+
+\subsection{What This App Does}
+
+This is a modern note-taking application that combines:
+\begin{itemize}
+    \item \textbf{Rich Text Editing} - Full-featured editor with formatting capabilities
+    \item \textbf{AI Autocomplete} - Press Shift+A to get AI-powered text suggestions
+    \item \textbf{Auto-Save} - Your work is automatically saved every 500ms
+    \item \textbf{User Authentication} - Secure login and user management
+    \item \textbf{Cloud Storage} - All notes stored in PostgreSQL database
+\end{itemize}
+
+\subsection{Technology Stack}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Component} & \textbf{Technology} \\
+\hline
+Frontend Framework & Next.js 15 (React 19) \\
+Language & TypeScript \\
+Text Editor & TipTap (ProseMirror) \\
+Styling & Tailwind CSS v4 + shadcn/ui \\
+Database & PostgreSQL (Neon) \\
+ORM & Drizzle ORM \\
+Authentication & Clerk \\
+AI Model & Google Gemini 2.0 \\
+State Management & TanStack React Query \\
+\hline
+\end{tabular}
+\end{table}
+
+
+\section{Architecture Overview}
+
+\subsection{Project Structure}
+
+The application follows Next.js 15's App Router structure:
+
+\begin{lstlisting}[language=bash]
+simaak-note/
+├── src/
+│   ├── app/                    # Next.js App Router
+│   │   ├── api/               # API Routes (Backend)
+│   │   │   ├── completion/    # AI text completion
+│   │   │   ├── createNoteBook/# Create new notes
+│   │   │   ├── saveNote/      # Save note content
+│   │   │   └── deleteNote/    # Delete notes
+│   │   ├── dashboard/         # Notes dashboard page
+│   │   ├── notebook/[noteId]/ # Individual note editor
+│   │   ├── sign-in/           # Clerk sign-in
+│   │   └── sign-up/           # Clerk sign-up
+│   ├── components/            # React Components
+│   │   ├── TipTapEditor.tsx   # Main editor component
+│   │   ├── TipTapMenuBar.tsx  # Editor toolbar
+│   │   ├── CreateNoteDialog.tsx # Note creation modal
+│   │   └── ui/                # shadcn/ui components
+│   ├── lib/                   # Utilities
+│   │   ├── db/                # Database config & schema
+│   │   ├── openai.ts          # OpenAI/DALL-E integration
+│   │   └── useDebounce.ts     # Debounce hook
+│   └── middleware.ts          # Clerk authentication
+└── drizzle.config.ts          # Database configuration
+\end{lstlisting}
+
+\subsection{Data Flow}
+
+\begin{enumerate}
+    \item \textbf{User Authentication}: Clerk middleware protects all routes except homepage
+    \item \textbf{Note Creation}: User creates note → API generates thumbnail → Saves to DB
+    \item \textbf{Note Editing}: User types → Debounced auto-save → Updates DB
+    \item \textbf{AI Completion}: User presses Shift+A → Sends context → Streams AI response
+\end{enumerate}
+
+
+\section{Database Layer}
+
+\subsection{Database Schema}
+
+The application uses a single table called \texttt{notes}:
+
+\begin{lstlisting}[language=SQL]
+CREATE TABLE notes (
+    id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    image_url TEXT,
+    user_id TEXT NOT NULL,
+    editor_state TEXT
+);
+\end{lstlisting}
+
+\textbf{Field Descriptions:}
+\begin{itemize}
+    \item \texttt{id}: Auto-incrementing primary key
+    \item \texttt{name}: Title of the note
+    \item \texttt{created\_at}: Timestamp when note was created
+    \item \texttt{image\_url}: URL to AI-generated thumbnail image
+    \item \texttt{user\_id}: Clerk user ID (for user isolation)
+    \item \texttt{editor\_state}: HTML content of the note (stored as text)
+\end{itemize}
+
+\subsection{Database Connection}
+
+Located in \texttt{src/lib/db/index.ts}:
+
+\begin{lstlisting}[language=JavaScript]
+import { neon } from '@neondatabase/serverless'
+import { drizzle } from 'drizzle-orm/neon-http'
+
+// Enable connection caching for better performance
+neonConfig.fetchConnectionCache = true
+
+// Get connection string from environment
+const sql = neon(process.env.DATABASE_URL!)
+export const db = drizzle(sql)
+\end{lstlisting}
+
+\textbf{Key Points:}
+\begin{itemize}
+    \item Uses Neon's serverless PostgreSQL driver
+    \item Connection caching enabled for performance
+    \item Drizzle ORM provides type-safe database queries
+    \item Connection string stored in \texttt{.env} file
+\end{itemize}
+
+
+\section{Authentication System}
+
+\subsection{Clerk Integration}
+
+The app uses Clerk for authentication, configured in \texttt{src/middleware.ts}:
+
+\begin{lstlisting}[language=JavaScript]
+import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
+
+// Define public routes (no auth required)
+const isPublic = createRouteMatcher(['/'])
+
+export default clerkMiddleware((auth, req) => {
+  if (isPublic(req)) return
+  // All other routes require authentication
+})
+\end{lstlisting}
+
+\textbf{How It Works:}
+\begin{enumerate}
+    \item Homepage (\texttt{/}) is public - anyone can access
+    \item All other routes require authentication
+    \item Unauthenticated users are redirected to sign-in page
+    \item After sign-in, users can only see their own notes
+\end{enumerate}
+
+\subsection{User Isolation}
+
+Every database query filters by \texttt{userId}:
+
+\begin{lstlisting}[language=JavaScript]
+// Example: Fetching user's notes
+const notes = await db
+  .select()
+  .from(notesSchema)
+  .where(eq(notesSchema.userId, userId))
+\end{lstlisting}
+
+This ensures users can only access their own data.
+
+
+\section{AI Integration - The Core Feature}
+
+This is the most important part! Let's break down exactly how the AI autocomplete works.
+
+\subsection{Overview of AI Flow}
+
+\begin{tcolorbox}[colback=blue!5!white,colframe=blue!75!black,title=AI Autocomplete Flow]
+\begin{enumerate}
+    \item User types in the editor
+    \item User presses \textbf{Shift + A}
+    \item Frontend extracts last 30 words as context
+    \item Frontend sends context to \texttt{/api/completion}
+    \item Backend calls Google Gemini API
+    \item Gemini generates completion text
+    \item Backend streams response character-by-character
+    \item Frontend displays text in real-time
+    \item Text is inserted at cursor position
+    \item Auto-save triggers after 500ms
+\end{enumerate}
+\end{tcolorbox}
+
+\subsection{Frontend: Triggering AI Completion}
+
+Located in \texttt{src/components/TipTapEditor.tsx}:
+
+\begin{lstlisting}[language=JavaScript]
+// Listen for Shift+A keyboard shortcut
+React.useEffect(() => {
+  if (!editor) return
+
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (!editor.isFocused) return
+    
+    if (e.shiftKey && e.key === "A") {
+      e.preventDefault()
+      
+      // Extract last 30 words for context
+      const words = editor.getText().split(" ")
+      const last30 = words.slice(-30).join(" ")
+      
+      // Call AI completion function
+      handleCompletion(last30)
+    }
+  }
+
+  editor.view.dom.addEventListener("keydown", handleKeyDown)
+  return () => {
+    editor.view.dom.removeEventListener("keydown", handleKeyDown)
+  }
+}, [editor, handleCompletion])
+\end{lstlisting}
+
+\textbf{Why last 30 words?}
+\begin{itemize}
+    \item Provides enough context for AI to understand what you're writing
+    \item Not too much data (keeps API calls fast and cheap)
+    \item Balances context quality with performance
+\end{itemize}
+
+
+\subsection{Frontend: Streaming AI Response}
+
+The \texttt{handleCompletion} function manages the streaming:
+
+\begin{lstlisting}[language=JavaScript]
+const handleCompletion = async (prompt: string) => {
+  try {
+    // Send POST request to our API
+    const response = await fetch("/api/completion", {
+      method: "POST",
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt }),
+    })
+
+    if (!response.ok) throw new Error(`HTTP error! ${response.status}`)
+    if (!response.body) throw new Error("No response body")
+
+    // Read the stream character by character
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let done = false
+    let text = ""
+
+    while (!done) {
+      const { value, done: readerDone } = await reader.read()
+      done = readerDone
+      
+      if (value) {
+        const chunk = decoder.decode(value)
+        text += chunk
+        
+        // Insert each character into editor immediately
+        editor.commands.insertContent(chunk)
+      }
+    }
+  } catch (err) {
+    console.error("AI completion error:", err)
+  }
+}
+\end{lstlisting}
+
+\textbf{Key Concepts:}
+\begin{itemize}
+    \item \texttt{ReadableStream}: Allows reading data in chunks as it arrives
+    \item \texttt{TextDecoder}: Converts binary data to text
+    \item \texttt{insertContent()}: TipTap command to insert text at cursor
+    \item Real-time display creates a "typing" effect
+\end{itemize}
+
+
+\subsection{Backend: AI Completion API}
+
+Located in \texttt{src/app/api/completion/route.ts}:
+
+\begin{lstlisting}[language=JavaScript]
+import { GoogleGenAI } from "@google/genai"
+
+export async function POST(req: Request) {
+  // 1. Extract the prompt from request
+  const { prompt } = await req.json()
+  
+  // 2. Initialize Gemini AI client
+  const ai = new GoogleGenAI({ 
+    apiKey: process.env.GEMINI_API_KEY 
+  })
+
+  // 3. Call Gemini API
+  const response = await ai.models.generateContent({
+    model: "gemini-2.0-flash-exp",
+    contents: `Complete this text naturally and concisely. 
+               Only provide the continuation, nothing else:
+               "${prompt}"`,
+    config: {
+      maxOutputTokens: 100,  // Limit response length
+      temperature: 0.7,       // Creativity level
+      topK: 40,              // Sampling parameter
+      topP: 0.95,            // Nucleus sampling
+    }
+  })
+
+  const completion = response.text || ''
+  
+  // 4. Create streaming response
+  const encoder = new TextEncoder()
+  const readableStream = new ReadableStream({
+    start(controller) {
+      let charIndex = 0
+      
+      const sendNextChar = () => {
+        if (charIndex < completion.length) {
+          const char = completion[charIndex]
+          controller.enqueue(encoder.encode(char))
+          charIndex++
+          
+          // Variable delay for realistic typing
+          let delay = 40
+          if (char === ' ') delay = 20
+          if (char === '.' || char === ',') delay = 80
+          
+          setTimeout(sendNextChar, delay)
+        } else {
+          controller.close()
+        }
+      }
+      
+      setTimeout(sendNextChar, 100)
+    },
+  })
+
+  return new Response(readableStream, {
+    headers: {
+      'Content-Type': 'text/plain; charset=utf-8',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+    },
+  })
+}
+\end{lstlisting}
+
+
+\subsection{Understanding the AI Parameters}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|p{8cm}|}
+\hline
+\textbf{Parameter} & \textbf{What It Does} \\
+\hline
+\texttt{maxOutputTokens: 100} & Limits response to ~75 words. Prevents overly long completions. \\
+\hline
+\texttt{temperature: 0.7} & Controls randomness. 0 = deterministic, 1 = very creative. 0.7 is balanced. \\
+\hline
+\texttt{topK: 40} & Considers top 40 most likely next words. Reduces nonsensical outputs. \\
+\hline
+\texttt{topP: 0.95} & Nucleus sampling. Considers words that make up 95\% probability mass. \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{Why Streaming Instead of Waiting?}
+
+\textbf{Without Streaming:}
+\begin{itemize}
+    \item User presses Shift+A
+    \item Wait 2-3 seconds...
+    \item All text appears at once
+    \item Feels slow and unresponsive
+\end{itemize}
+
+\textbf{With Streaming:}
+\begin{itemize}
+    \item User presses Shift+A
+    \item Text starts appearing immediately (character by character)
+    \item Feels fast and interactive
+    \item Better user experience
+\end{itemize}
+
+\subsection{Token Fetching Explained}
+
+\textbf{What are tokens?}
+\begin{itemize}
+    \item Tokens are pieces of words that AI models understand
+    \item Example: "Hello world" = 2 tokens
+    \item Example: "Artificial Intelligence" = 3 tokens
+    \item AI models process text as tokens, not characters
+\end{itemize}
+
+\textbf{How token fetching works in our app:}
+\begin{enumerate}
+    \item We send the last 30 words to Gemini (input tokens)
+    \item Gemini processes these tokens to understand context
+    \item Gemini generates new tokens (output tokens)
+    \item We limit output to 100 tokens (\texttt{maxOutputTokens: 100})
+    \item Each token is converted back to text
+    \item We stream this text character-by-character to the user
+\end{enumerate}
+
+\textbf{Cost Consideration:}
+\begin{itemize}
+    \item APIs charge per token (input + output)
+    \item Limiting to 100 output tokens keeps costs low
+    \item Last 30 words is ~40-50 input tokens
+    \item Total: ~150 tokens per completion request
+\end{itemize}
+
+
+\section{Note Management System}
+
+\subsection{Creating a New Note}
+
+\textbf{User Flow:}
+\begin{enumerate}
+    \item User clicks "New Note" button on dashboard
+    \item Dialog opens asking for note title
+    \item User enters title and clicks "Create Note"
+    \item API generates AI thumbnail image
+    \item Note is saved to database
+    \item User is redirected to note editor
+\end{enumerate}
+
+\textbf{API Implementation} (\texttt{src/app/api/createNoteBook/route.ts}):
+
+\begin{lstlisting}[language=JavaScript]
+export async function POST(req: Request) {
+  // 1. Verify user is authenticated
+  const {userId} = await auth()
+  if (!userId) return new Response("Unauthorized", {status: 401})
+  
+  // 2. Get note name from request
+  const body = await req.json()
+  const name = body.name
+  
+  // 3. Generate image description using GPT-3.5
+  const image_description = await generateImagePrompt(name)
+  
+  // 4. Generate thumbnail using DALL-E
+  const image_url = await generateImage(image_description)
+  
+  // 5. Insert note into database
+  const note_ids = await db.insert(notes).values({
+    userId,
+    name,
+    imageUrl: image_url,
+    editorState: "{}",  // Empty initial state
+  }).returning({insertedId: notes.id})
+  
+  // 6. Return the new note ID
+  return new NextResponse(JSON.stringify({
+    note_id: note_ids[0].insertedId,
+  }), {status: 200})
+}
+\end{lstlisting}
+
+
+\subsection{AI Thumbnail Generation}
+
+Located in \texttt{src/lib/openai.ts}:
+
+\begin{lstlisting}[language=JavaScript]
+// Step 1: Generate image description from note title
+export async function generateImagePrompt(name: string) {
+  const response = await openai.createChatCompletion({
+    model: "gpt-3.5-turbo",
+    messages: [
+      {
+        role: "system", 
+        content: "Generate minimalistic, flat styled, safe 
+                  thumbnail descriptions for notes."
+      },
+      {
+        role: "user", 
+        content: `Generate a simple thumbnail description 
+                  for: ${name}`
+      }
+    ]
+  })
+  
+  return response.choices[0].message.content
+}
+
+// Step 2: Generate actual image from description
+export async function generateImage(image_description: string) {
+  const response = await openaiClient.images.generate({
+    model: "dall-e-2",
+    prompt: image_description,
+    size: "256x256",
+  })
+  
+  return response.data[0].url
+}
+\end{lstlisting}
+
+\textbf{Why two steps?}
+\begin{enumerate}
+    \item Note title might be vague: "Meeting Notes"
+    \item GPT-3.5 enhances it: "A minimalist flat icon of a notepad with a pen"
+    \item DALL-E generates better images from detailed descriptions
+    \item Fallback to placeholder if API fails or billing limit reached
+\end{enumerate}
+
+
+\subsection{Auto-Save Mechanism}
+
+\textbf{The Challenge:}
+\begin{itemize}
+    \item User types continuously
+    \item We can't save after every keystroke (too many API calls)
+    \item We can't wait too long (risk losing data)
+    \item Solution: Debouncing!
+\end{itemize}
+
+\textbf{Debouncing Implementation} (\texttt{src/lib/useDebounce.ts}):
+
+\begin{lstlisting}[language=JavaScript]
+export function useDebounce(value: string, delay: number) {
+  const [debouncedValue, setDebouncedValue] = React.useState(value)
+
+  React.useEffect(() => {
+    // Set a timer to update after delay
+    const handler = setTimeout(() => {
+      setDebouncedValue(value)
+    }, delay)
+    
+    // Clear timer if value changes before delay
+    return () => {
+      clearTimeout(handler)
+    }
+  }, [value, delay])
+
+  return debouncedValue
+}
+\end{lstlisting}
+
+\textbf{How it works:}
+\begin{enumerate}
+    \item User types: "H"
+    \item Timer starts (500ms)
+    \item User types: "e" (within 500ms)
+    \item Previous timer cancelled, new timer starts
+    \item User types: "l", "l", "o"
+    \item Each keystroke resets the timer
+    \item User stops typing
+    \item After 500ms of no typing, save triggers
+\end{enumerate}
+
+
+\textbf{Auto-Save in TipTapEditor:}
+
+\begin{lstlisting}[language=JavaScript]
+// Debounce editor state changes
+const debouncedEditorState = useDebounce(editorState, 500)
+
+// Save when debounced value changes
+React.useEffect(() => {
+  // Skip initial render
+  if (!hasInitialized.current) {
+    hasInitialized.current = true
+    return
+  }
+
+  // Skip if content hasn't changed
+  if (debouncedEditorState === lastSavedContent.current) {
+    return
+  }
+
+  // Skip if empty
+  if (debouncedEditorState === "" || 
+      debouncedEditorState === `<h1>${note.name}</h1>`) {
+    return
+  }
+
+  // Save to database
+  saveNote.mutate(debouncedEditorState, {
+    onSuccess: () => console.log("Saved!"),
+    onError: (err) => console.error(err),
+  })
+  
+  lastSavedContent.current = debouncedEditorState
+}, [debouncedEditorState])
+\end{lstlisting}
+
+\textbf{Save API} (\texttt{src/app/api/saveNote/route.ts}):
+
+\begin{lstlisting}[language=JavaScript]
+export async function POST(req: Request) {
+  const { noteId, editorState } = await req.json()
+  
+  // Validate inputs
+  if (!editorState || !noteId) {
+    return new NextResponse("Missing data", { status: 400 })
+  }
+
+  // Get current note from database
+  const notes = await db
+    .select()
+    .from(notesSchema)
+    .where(eq(notesSchema.id, parseInt(noteId)))
+
+  // Only update if content changed
+  if (notes[0].editorState !== editorState) {
+    await db
+      .update(notesSchema)
+      .set({ editorState })
+      .where(eq(notesSchema.id, parseInt(noteId)))
+  }
+
+  return NextResponse.json({ success: true })
+}
+\end{lstlisting}
+
+
+\section{Rich Text Editor (TipTap)}
+
+\subsection{What is TipTap?}
+
+TipTap is a headless rich text editor built on ProseMirror. "Headless" means it provides the editing logic but you control the UI.
+
+\subsection{Editor Initialization}
+
+\begin{lstlisting}[language=JavaScript]
+const editor = useEditor({
+  autofocus: true,              // Focus on mount
+  extensions: [StarterKit],     // Basic formatting features
+  content: editorState,         // Initial HTML content
+  onUpdate: ({ editor }) => {   // Called on every change
+    setEditorState(editor.getHTML())
+  },
+  immediatelyRender: false,     // Fixes SSR hydration
+})
+\end{lstlisting}
+
+\subsection{StarterKit Extensions}
+
+The StarterKit includes:
+\begin{itemize}
+    \item \textbf{Bold, Italic, Strike} - Text formatting
+    \item \textbf{Headings} - H1, H2, H3
+    \item \textbf{Paragraph} - Normal text blocks
+    \item \textbf{BulletList, OrderedList} - Lists
+    \item \textbf{Code, CodeBlock} - Code formatting
+    \item \textbf{Blockquote} - Quote blocks
+    \item \textbf{HardBreak} - Line breaks
+    \item \textbf{History} - Undo/Redo
+\end{itemize}
+
+\subsection{Editor Commands}
+
+TipTap provides commands to manipulate content:
+
+\begin{lstlisting}[language=JavaScript]
+// Insert text at cursor
+editor.commands.insertContent("Hello")
+
+// Get all text (no HTML)
+const text = editor.getText()
+
+// Get HTML content
+const html = editor.getHTML()
+
+// Check if editor is focused
+if (editor.isFocused) { /* ... */ }
+
+// Toggle formatting
+editor.chain().focus().toggleBold().run()
+editor.chain().focus().toggleItalic().run()
+\end{lstlisting}
+
+
+\section{State Management with React Query}
+
+\subsection{Why React Query?}
+
+React Query (TanStack Query) handles:
+\begin{itemize}
+    \item Server state management
+    \item Caching
+    \item Loading states
+    \item Error handling
+    \item Automatic retries
+\end{itemize}
+
+\subsection{Setup}
+
+Located in \texttt{src/components/Provider.tsx}:
+
+\begin{lstlisting}[language=JavaScript]
+'use client'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+
+export default function Provider({ children }) {
+  const queryClient = new QueryClient()
+  
+  return (
+    <QueryClientProvider client={queryClient}>
+      {children}
+    </QueryClientProvider>
+  )
+}
+\end{lstlisting}
+
+\subsection{Using Mutations}
+
+Mutations are for CREATE, UPDATE, DELETE operations:
+
+\begin{lstlisting}[language=JavaScript]
+// Define mutation
+const saveNote = useMutation({
+  mutationFn: async (content: string) => {
+    const response = await axios.post("/api/saveNote", {
+      noteId: note.id,
+      editorState: content,
+    })
+    return response.data
+  },
+})
+
+// Trigger mutation
+saveNote.mutate(editorState, {
+  onSuccess: (data) => {
+    console.log("Saved!", data)
+  },
+  onError: (err) => {
+    console.error("Failed to save", err)
+  },
+})
+
+// Check mutation state
+if (saveNote.isPending) return "Saving..."
+if (saveNote.isError) return "Error!"
+if (saveNote.isSuccess) return "Saved!"
+\end{lstlisting}
+
+
+\section{Complete User Journey}
+
+Let's trace a complete user session from start to finish.
+
+\subsection{Journey 1: Creating and Editing a Note}
+
+\begin{enumerate}
+    \item \textbf{User visits homepage} (\texttt{/})
+    \begin{itemize}
+        \item Public route, no authentication required
+        \item Shows landing page with "Get Started" button
+    \end{itemize}
+    
+    \item \textbf{User clicks "Get Started"}
+    \begin{itemize}
+        \item Redirected to \texttt{/dashboard}
+        \item Middleware checks authentication
+        \item Not authenticated → Redirected to \texttt{/sign-in}
+    \end{itemize}
+    
+    \item \textbf{User signs in with Clerk}
+    \begin{itemize}
+        \item Clerk handles authentication
+        \item Creates session
+        \item Redirects back to \texttt{/dashboard}
+    \end{itemize}
+    
+    \item \textbf{Dashboard loads}
+    \begin{itemize}
+        \item Server fetches user's notes from database
+        \item Filters by \texttt{userId}
+        \item Renders note cards with thumbnails
+    \end{itemize}
+    
+    \item \textbf{User clicks "New Note"}
+    \begin{itemize}
+        \item Dialog opens
+        \item User enters title: "Project Ideas"
+    \end{itemize}
+    
+    \item \textbf{Note creation process}
+    \begin{itemize}
+        \item POST to \texttt{/api/createNoteBook}
+        \item GPT-3.5 generates image description
+        \item DALL-E generates thumbnail
+        \item Note saved to database
+        \item Returns note ID
+    \end{itemize}
+    
+    \item \textbf{Redirect to editor}
+    \begin{itemize}
+        \item Navigate to \texttt{/notebook/[noteId]}
+        \item TipTap editor initializes
+        \item Shows note title as H1
+    \end{itemize}
+    
+    \item \textbf{User starts typing}
+    \begin{itemize}
+        \item Types: "Build an AI-powered..."
+        \item Each keystroke updates \texttt{editorState}
+        \item Debounce timer resets with each keystroke
+    \end{itemize}
+    
+    \item \textbf{User pauses typing}
+    \begin{itemize}
+        \item 500ms passes with no typing
+        \item Debounce triggers
+        \item Auto-save mutation fires
+        \item POST to \texttt{/api/saveNote}
+        \item Database updated
+        \item Button shows "Saved"
+    \end{itemize}
+    
+    \item \textbf{User wants AI help}
+    \begin{itemize}
+        \item Presses \textbf{Shift + A}
+        \item Last 30 words extracted
+        \item POST to \texttt{/api/completion}
+        \item Gemini generates completion
+        \item Text streams character-by-character
+        \item Inserted at cursor position
+    \end{itemize}
+    
+    \item \textbf{Auto-save after AI completion}
+    \begin{itemize}
+        \item AI text added to editor
+        \item \texttt{editorState} updates
+        \item Debounce triggers after 500ms
+        \item Content saved to database
+    \end{itemize}
+\end{enumerate}
+
+
+\section{Environment Variables}
+
+The application requires several API keys and configuration values stored in \texttt{.env} file:
+
+\begin{lstlisting}[language=bash]
+# Database Connection
+DATABASE_URL="postgresql://user:pass@host/database"
+
+# Clerk Authentication
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="pk_test_..."
+CLERK_SECRET_KEY="sk_test_..."
+
+# AI Services
+GEMINI_API_KEY="AIza..."
+OPENAI_API_KEY="sk-..."
+\end{lstlisting}
+
+\subsection{Security Best Practices}
+
+\begin{itemize}
+    \item \textbf{Never commit .env files} - Added to \texttt{.gitignore}
+    \item \textbf{NEXT\_PUBLIC\_*} - These are exposed to browser (safe for public keys)
+    \item \textbf{Without NEXT\_PUBLIC\_*} - Server-only (for secret keys)
+    \item \textbf{Vercel deployment} - Add env vars in Vercel dashboard
+\end{itemize}
+
+\section{API Endpoints Summary}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|l|p{6cm}|}
+\hline
+\textbf{Endpoint} & \textbf{Method} & \textbf{Purpose} \\
+\hline
+\texttt{/api/createNoteBook} & POST & Create new note with AI thumbnail \\
+\hline
+\texttt{/api/saveNote} & POST & Save note content to database \\
+\hline
+\texttt{/api/deleteNote} & POST & Delete a note \\
+\hline
+\texttt{/api/completion} & POST & AI text completion (streaming) \\
+\hline
+\end{tabular}
+\end{table}
+
+
+\section{Key Concepts to Understand}
+
+\subsection{Server Components vs Client Components}
+
+Next.js 15 uses React Server Components by default:
+
+\begin{itemize}
+    \item \textbf{Server Components} (default)
+    \begin{itemize}
+        \item Run on server only
+        \item Can directly access database
+        \item Cannot use hooks or browser APIs
+        \item Example: \texttt{dashboard/page.tsx}
+    \end{itemize}
+    
+    \item \textbf{Client Components} (marked with \texttt{'use client'})
+    \begin{itemize}
+        \item Run in browser
+        \item Can use React hooks
+        \item Can handle user interactions
+        \item Example: \texttt{TipTapEditor.tsx}
+    \end{itemize}
+\end{itemize}
+
+\subsection{API Routes}
+
+API routes are server-side endpoints:
+\begin{itemize}
+    \item Located in \texttt{app/api/*/route.ts}
+    \item Export functions: \texttt{GET}, \texttt{POST}, \texttt{PUT}, \texttt{DELETE}
+    \item Run on server (can access secrets, database)
+    \item Called from client components using \texttt{fetch} or \texttt{axios}
+\end{itemize}
+
+\subsection{TypeScript Benefits}
+
+\begin{lstlisting}[language=JavaScript]
+// Type-safe database schema
+export type NoteType = typeof notes.$inferSelect
+
+// TypeScript knows the shape of 'note'
+const TipTapEditor = ({ note }: { note: NoteType }) => {
+  // Autocomplete works!
+  console.log(note.name)
+  console.log(note.editorState)
+}
+\end{lstlisting}
+
+Benefits:
+\begin{itemize}
+    \item Catch errors before runtime
+    \item Better IDE autocomplete
+    \item Self-documenting code
+    \item Easier refactoring
+\end{itemize}
+
+
+\section{Common Patterns and Best Practices}
+
+\subsection{Error Handling}
+
+Always wrap API calls in try-catch:
+
+\begin{lstlisting}[language=JavaScript]
+try {
+  const response = await fetch("/api/completion", {
+    method: "POST",
+    body: JSON.stringify({ prompt }),
+  })
+  
+  if (!response.ok) {
+    throw new Error(`HTTP error! ${response.status}`)
+  }
+  
+  // Process response...
+} catch (error) {
+  console.error("Error:", error)
+  setErrorMessage(error.message)
+}
+\end{lstlisting}
+
+\subsection{Loading States}
+
+Always show loading indicators:
+
+\begin{lstlisting}[language=JavaScript]
+<Button disabled={createNoteBook.isPending}>
+  {createNoteBook.isPending ? (
+    <Loader2 className="animate-spin" />
+  ) : (
+    'Create Note'
+  )}
+</Button>
+\end{lstlisting}
+
+\subsection{Data Validation}
+
+Validate inputs on both client and server:
+
+\begin{lstlisting}[language=JavaScript]
+// Client-side
+if (input.trim() === '') {
+  alert('Please enter a note name')
+  return
+}
+
+// Server-side
+if (!editorState || !noteId) {
+  return new NextResponse("Missing data", { status: 400 })
+}
+\end{lstlisting}
+
+
+\section{Development Workflow}
+
+\subsection{Setting Up Locally}
+
+\begin{enumerate}
+    \item \textbf{Clone repository}
+    \begin{lstlisting}[language=bash]
+git clone <repo-url>
+cd simaak-note
+    \end{lstlisting}
+    
+    \item \textbf{Install dependencies}
+    \begin{lstlisting}[language=bash]
+npm install
+    \end{lstlisting}
+    
+    \item \textbf{Set up environment variables}
+    \begin{itemize}
+        \item Create \texttt{.env} file
+        \item Add all required keys (see Section 8)
+    \end{itemize}
+    
+    \item \textbf{Set up database}
+    \begin{lstlisting}[language=bash]
+npm run db:generate  # Generate migrations
+npm run db:push      # Apply to database
+    \end{lstlisting}
+    
+    \item \textbf{Run development server}
+    \begin{lstlisting}[language=bash]
+npm run dev
+    \end{lstlisting}
+    
+    \item \textbf{Open browser}
+    \begin{itemize}
+        \item Navigate to \texttt{http://localhost:3000}
+    \end{itemize}
+\end{enumerate}
+
+\subsection{Making Changes}
+
+\begin{enumerate}
+    \item Make your code changes
+    \item Test locally
+    \item Check for TypeScript errors: \texttt{npm run lint}
+    \item Commit changes
+    \item Push to repository
+    \item Vercel auto-deploys (if connected)
+\end{enumerate}
+
+
+\section{Debugging Tips}
+
+\subsection{Common Issues and Solutions}
+
+\begin{tcolorbox}[colback=red!5!white,colframe=red!75!black,title=Issue: AI completion not working]
+\textbf{Symptoms:} Shift+A does nothing or shows error
+
+\textbf{Check:}
+\begin{itemize}
+    \item Is \texttt{GEMINI\_API\_KEY} set in \texttt{.env}?
+    \item Check browser console for errors
+    \item Check server logs: \texttt{npm run dev}
+    \item Verify API key is valid
+\end{itemize}
+\end{tcolorbox}
+
+\begin{tcolorbox}[colback=red!5!white,colframe=red!75!black,title=Issue: Notes not saving]
+\textbf{Symptoms:} Button stuck on "Saving..."
+
+\textbf{Check:}
+\begin{itemize}
+    \item Is database connection working?
+    \item Check \texttt{DATABASE\_URL} in \texttt{.env}
+    \item Look for errors in browser console
+    \item Check network tab for failed requests
+\end{itemize}
+\end{tcolorbox}
+
+\begin{tcolorbox}[colback=red!5!white,colframe=red!75!black,title=Issue: Authentication not working]
+\textbf{Symptoms:} Redirected to sign-in repeatedly
+
+\textbf{Check:}
+\begin{itemize}
+    \item Are Clerk keys correct in \texttt{.env}?
+    \item Check Clerk dashboard for issues
+    \item Clear browser cookies and try again
+    \item Verify middleware is configured correctly
+\end{itemize}
+\end{tcolorbox}
+
+\subsection{Useful Debugging Commands}
+
+\begin{lstlisting}[language=bash]
+# Check TypeScript errors
+npm run lint
+
+# View database schema
+npx drizzle-kit studio
+
+# Check environment variables are loaded
+console.log(process.env.GEMINI_API_KEY)
+
+# View all console logs
+# Open browser DevTools > Console
+\end{lstlisting}
+
+
+\section{Potential Improvements}
+
+Here are some ideas for enhancing the application:
+
+\subsection{Feature Enhancements}
+
+\begin{enumerate}
+    \item \textbf{Note Search}
+    \begin{itemize}
+        \item Implement full-text search
+        \item Search by title and content
+        \item Use PostgreSQL's \texttt{tsvector} for performance
+    \end{itemize}
+    
+    \item \textbf{Note Sharing}
+    \begin{itemize}
+        \item Generate shareable links
+        \item Public/private toggle
+        \item Collaboration features
+    \end{itemize}
+    
+    \item \textbf{Rich Media}
+    \begin{itemize}
+        \item Image uploads
+        \item File attachments
+        \item Embed videos/links
+    \end{itemize}
+    
+    \item \textbf{Organization}
+    \begin{itemize}
+        \item Folders/categories
+        \item Tags
+        \item Favorites
+    \end{itemize}
+    
+    \item \textbf{AI Enhancements}
+    \begin{itemize}
+        \item Summarize notes
+        \item Generate titles automatically
+        \item Grammar checking
+        \item Multiple AI models to choose from
+    \end{itemize}
+\end{enumerate}
+
+\subsection{Technical Improvements}
+
+\begin{enumerate}
+    \item \textbf{Performance}
+    \begin{itemize}
+        \item Implement pagination for notes list
+        \item Add caching with React Query
+        \item Optimize images with Next.js Image
+    \end{itemize}
+    
+    \item \textbf{Testing}
+    \begin{itemize}
+        \item Unit tests with Jest
+        \item Integration tests with Playwright
+        \item API endpoint tests
+    \end{itemize}
+    
+    \item \textbf{Monitoring}
+    \begin{itemize}
+        \item Error tracking (Sentry)
+        \item Analytics (Vercel Analytics)
+        \item Performance monitoring
+    \end{itemize}
+\end{enumerate}
+
+
+\section{Learning Resources}
+
+\subsection{Official Documentation}
+
+\begin{itemize}
+    \item \textbf{Next.js}: \url{https://nextjs.org/docs}
+    \item \textbf{React}: \url{https://react.dev}
+    \item \textbf{TypeScript}: \url{https://www.typescriptlang.org/docs}
+    \item \textbf{TipTap}: \url{https://tiptap.dev/docs}
+    \item \textbf{Drizzle ORM}: \url{https://orm.drizzle.team/docs}
+    \item \textbf{Clerk}: \url{https://clerk.com/docs}
+    \item \textbf{TanStack Query}: \url{https://tanstack.com/query/latest}
+    \item \textbf{Tailwind CSS}: \url{https://tailwindcss.com/docs}
+    \item \textbf{Google Gemini}: \url{https://ai.google.dev/docs}
+\end{itemize}
+
+\subsection{Key Concepts to Study}
+
+\begin{enumerate}
+    \item \textbf{React Hooks}
+    \begin{itemize}
+        \item \texttt{useState}, \texttt{useEffect}, \texttt{useRef}
+        \item Custom hooks like \texttt{useDebounce}
+    \end{itemize}
+    
+    \item \textbf{Async/Await}
+    \begin{itemize}
+        \item Promises
+        \item Error handling with try-catch
+        \item Async functions
+    \end{itemize}
+    
+    \item \textbf{HTTP Streaming}
+    \begin{itemize}
+        \item ReadableStream API
+        \item Server-Sent Events
+        \item Real-time data transfer
+    \end{itemize}
+    
+    \item \textbf{Database Queries}
+    \begin{itemize}
+        \item SQL basics
+        \item ORM patterns
+        \item Drizzle query builder
+    \end{itemize}
+    
+    \item \textbf{Authentication}
+    \begin{itemize}
+        \item JWT tokens
+        \item Session management
+        \item Middleware patterns
+    \end{itemize}
+\end{enumerate}
+
+
+\section{Glossary}
+
+\begin{description}
+    \item[API (Application Programming Interface)] A set of endpoints that allow different software to communicate
+    
+    \item[Debouncing] Delaying function execution until after a period of inactivity
+    
+    \item[Drizzle ORM] TypeScript ORM for type-safe database queries
+    
+    \item[Hydration] Process of attaching React to server-rendered HTML
+    
+    \item[Middleware] Code that runs before a request is completed
+    
+    \item[Mutation] Operation that modifies data (CREATE, UPDATE, DELETE)
+    
+    \item[ORM (Object-Relational Mapping)] Tool that converts between database tables and code objects
+    
+    \item[ProseMirror] The underlying editor framework that TipTap is built on
+    
+    \item[Server Component] React component that runs only on the server
+    
+    \item[SSR (Server-Side Rendering)] Rendering React components on the server
+    
+    \item[Streaming] Sending data in chunks as it becomes available
+    
+    \item[Token] Unit of text that AI models process (roughly 0.75 words)
+    
+    \item[TypeScript] JavaScript with type checking
+    
+    \item[Webhook] HTTP callback triggered by an event
+\end{description}
+
+
+\section{Quick Reference}
+
+\subsection{File Locations Cheat Sheet}
+
+\begin{table}[h]
+\small
+\begin{tabular}{|p{5cm}|p{8cm}|}
+\hline
+\textbf{What You Need} & \textbf{Where to Find It} \\
+\hline
+AI completion logic & \texttt{src/app/api/completion/route.ts} \\
+\hline
+Editor component & \texttt{src/components/TipTapEditor.tsx} \\
+\hline
+Auto-save logic & \texttt{src/components/TipTapEditor.tsx} (useEffect with debounce) \\
+\hline
+Database schema & \texttt{src/lib/db/schema.ts} \\
+\hline
+Database connection & \texttt{src/lib/db/index.ts} \\
+\hline
+Authentication config & \texttt{src/middleware.ts} \\
+\hline
+Note creation API & \texttt{src/app/api/createNoteBook/route.ts} \\
+\hline
+Save note API & \texttt{src/app/api/saveNote/route.ts} \\
+\hline
+Dashboard page & \texttt{src/app/dashboard/page.tsx} \\
+\hline
+Note editor page & \texttt{src/app/notebook/[noteId]/page.tsx} \\
+\hline
+Debounce hook & \texttt{src/lib/useDebounce.ts} \\
+\hline
+AI thumbnail generation & \texttt{src/lib/openai.ts} \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{Important Commands}
+
+\begin{lstlisting}[language=bash]
+# Development
+npm run dev              # Start dev server
+npm run build            # Build for production
+npm run start            # Start production server
+
+# Database
+npm run db:generate      # Generate migrations
+npm run db:push          # Apply schema changes
+npx drizzle-kit studio   # Open database GUI
+
+# Code Quality
+npm run lint             # Check for errors
+\end{lstlisting}
+
+
+\section{Conclusion}
+
+Congratulations! You now have a comprehensive understanding of how this AI-powered note-taking application works.
+
+\subsection{Key Takeaways}
+
+\begin{enumerate}
+    \item \textbf{Architecture}: Next.js App Router with server and client components
+    \item \textbf{Database}: PostgreSQL with Drizzle ORM for type-safe queries
+    \item \textbf{Authentication}: Clerk middleware protects routes and isolates user data
+    \item \textbf{Editor}: TipTap provides rich text editing capabilities
+    \item \textbf{AI Integration}: Google Gemini streams completions character-by-character
+    \item \textbf{Auto-Save}: Debouncing prevents excessive API calls
+    \item \textbf{State Management}: React Query handles server state and mutations
+\end{enumerate}
+
+\subsection{What Makes This App Special}
+
+\begin{itemize}
+    \item \textbf{Real-time AI streaming} creates a smooth, interactive experience
+    \item \textbf{Automatic saving} means users never lose their work
+    \item \textbf{Type safety} with TypeScript catches errors early
+    \item \textbf{Modern stack} uses cutting-edge technologies
+    \item \textbf{Clean architecture} makes the code maintainable and scalable
+\end{itemize}
+
+\subsection{Next Steps}
+
+\begin{enumerate}
+    \item Set up the project locally and run it
+    \item Experiment with the code - change AI parameters, modify the UI
+    \item Try implementing one of the suggested improvements
+    \item Read the official documentation for technologies you're less familiar with
+    \item Ask questions when you're stuck!
+\end{enumerate}
+
+\vspace{1cm}
+
+
+\end{document}
