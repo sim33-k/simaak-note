@@ -1,36 +1,43 @@
 # AI-Powered Note-Taking App
 
-A modern, AI-enhanced note-taking application built with Next.js, featuring real-time AI autocomplete, rich text editing, and seamless cloud synchronization.
+> A modern, intelligent note-taking application with AI autocomplete, rich text editing, and seamless cloud synchronization.
 
-## ✨ Features
+![Homepage](images/homepage.png)
 
-- **🤖 AI-Powered Autocomplete** - Press `Shift + A` for intelligent text completion using Gemini AI
-- **📝 Rich Text Editor** - TipTap-based editor with formatting, headings, lists, and more
-- **💾 Auto-Save** - Automatic saving with 500ms debouncing
-- **🔐 Authentication** - Secure user management with Clerk
-- **☁️ Cloud Sync** - PostgreSQL database with Drizzle ORM
-- **🎨 Modern UI** - Beautiful interface built with Tailwind CSS and shadcn/ui
-- **📱 Responsive Design** - Works seamlessly on desktop and mobile
+## Features
 
-## 🚀 Tech Stack
+- **AI-Powered Autocomplete** - Press `Shift + A` for intelligent text completion using Gemini AI
+- **Rich Text Editor** - TipTap-based editor with formatting, headings, lists, and more
+- **Auto-Save** - Automatic saving with 500ms debouncing
+- **Authentication** - Secure user management with Clerk
+- **Cloud Sync** - PostgreSQL database with Drizzle ORM
+- **Modern UI** - Beautiful interface built with Tailwind CSS and shadcn/ui
+- **Responsive Design** - Works seamlessly on desktop and mobile
 
-- **Frontend**: Next.js 15, React 19, TypeScript
-- **Editor**: TipTap (ProseMirror-based rich text editor)
-- **Styling**: Tailwind CSS v4, shadcn/ui components
-- **Database**: PostgreSQL with Drizzle ORM
-- **Authentication**: Clerk
-- **AI Integration**: Google Gemini API
-- **State Management**: TanStack React Query
-- **Deployment**: Vercel-ready
+## Tech Stack
 
-## 📋 Prerequisites
+| Category | Technology |
+|----------|-----------|
+| **Framework** | Next.js 15 (App Router) |
+| **Language** | TypeScript |
+| **Editor** | TipTap (ProseMirror) |
+| **Styling** | Tailwind CSS v4 + shadcn/ui |
+| **Database** | PostgreSQL + Drizzle ORM |
+| **Auth** | Clerk |
+| **AI** | Google Gemini 2.0 |
+| **State** | TanStack React Query |
+| **Deployment** | Vercel |
 
-- Node.js 18+ 
-- PostgreSQL database
-- Google Gemini API key
-- Clerk account for authentication
+## Prerequisites
 
-## 🛠️ Installation
+Before you begin, ensure you have:
+
+- **Node.js** 18 or higher
+- **PostgreSQL** database (or use [Neon](https://neon.tech/) for serverless Postgres)
+- **Google Gemini API** key ([Get one here](https://ai.google.dev/))
+- **Clerk** account for authentication ([Sign up here](https://clerk.com/))
+
+## Installation
 
 1. **Clone the repository**
    ```bash
@@ -71,15 +78,20 @@ A modern, AI-enhanced note-taking application built with Next.js, featuring real
 6. **Open your browser**
    Navigate to [http://localhost:3000](http://localhost:3000)
 
-## 🎯 Usage
+## Usage
 
 ### Creating Notes
+
+![Notes Dashboard](images/notes_page.png)
+
 1. Navigate to the dashboard
 2. Click "Create Note" 
 3. Enter a title - AI will automatically generate a relevant thumbnail
 4. Start writing with the rich text editor
 
 ### AI Autocomplete
+
+![Note Editor](images/note_editor.png)
 1. **Position your cursor** where you want the AI to continue
 2. **Press `Shift + A`** to trigger autocomplete
 3. **AI analyzes** the last 30 words for context
@@ -93,7 +105,7 @@ A modern, AI-enhanced note-taking application built with Next.js, featuring real
 - **Code blocks**: Syntax-highlighted code
 - **Blockquotes**: Quote formatting
 
-## 🔧 Development
+## Development
 
 ### Project Structure
 ```
@@ -125,20 +137,23 @@ simaak-note/
 - **`TipTapMenuBar`** - Editor toolbar
 - **`Provider`** - React Query provider
 
-## 🌐 API Endpoints
+## API Endpoints
 
-- `POST /api/createNoteBook` - Create new note with AI-generated thumbnail
-- `POST /api/saveNote` - Save note content
-- `POST /api/completion` - AI text completion using Gemini
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/createNoteBook` | POST | Create new note with AI-generated thumbnail |
+| `/api/saveNote` | POST | Save note content |
+| `/api/deleteNote` | POST | Delete a note |
+| `/api/completion` | POST | AI text completion using Gemini |
 
-## 🔒 Security Features
+## Security Features
 
 - **Authentication Required** - All routes protected by Clerk middleware
 - **User Isolation** - Users can only access their own notes
 - **Input Validation** - Sanitized inputs and API rate limiting
 - **Environment Variables** - Sensitive keys stored securely
 
-## 🚀 Deployment
+## Deployment
 
 ### Vercel (Recommended)
 1. Connect your GitHub repository to Vercel
@@ -150,7 +165,7 @@ simaak-note/
 2. Start production server: `npm run start`
 3. Set up reverse proxy (nginx/Apache) if needed
 
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feature/amazing-feature`
@@ -158,25 +173,32 @@ simaak-note/
 4. Push to the branch: `git push origin feature/amazing-feature`
 5. Open a Pull Request
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🆘 Support
+## Support
 
 - **Documentation**: Check this README and inline code comments
 - **Issues**: Report bugs via GitHub Issues
 - **Discussions**: Use GitHub Discussions for questions and ideas
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
-- [Next.js](https://nextjs.org/) - React framework
-- [TipTap](https://tiptap.dev/) - Rich text editor
-- [Clerk](https://clerk.com/) - Authentication
-- [Drizzle](https://orm.drizzle.team/) - Database ORM
-- [shadcn/ui](https://ui.shadcn.com/) - UI components
-- [Tailwind CSS](https://tailwindcss.com/) - CSS framework
+Built with these amazing technologies:
+
+- [Next.js](https://nextjs.org/) - The React Framework
+- [TipTap](https://tiptap.dev/) - Headless Rich Text Editor
+- [Clerk](https://clerk.com/) - User Authentication
+- [Drizzle ORM](https://orm.drizzle.team/) - TypeScript ORM
+- [shadcn/ui](https://ui.shadcn.com/) - Beautiful UI Components
+- [Tailwind CSS](https://tailwindcss.com/) - Utility-First CSS
+- [Google Gemini](https://ai.google.dev/) - AI Language Model
 
 ---
 
-**Built with ❤️ using modern web technologies**
+<div align="center">
+  <strong>Built using modern web technologies</strong>
+  <br />
+  <sub>Star this repo if you find it helpful!</sub>
+</div>

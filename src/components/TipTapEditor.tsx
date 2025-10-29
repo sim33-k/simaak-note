@@ -21,11 +21,11 @@ const TipTapEditor = ({ note }: Props) => {
 
   const [completion, setCompletion] = React.useState("");
   const [errorMessage, setErrorMessage] = React.useState("");
-  
+
   const hasInitialized = React.useRef(false);
   const lastSavedContent = React.useRef(editorState);
   const lastCompletion = React.useRef("");
-  
+
   const saveNote = useMutation({
     mutationFn: async (content: string) => {
       const response = await axios.post("/api/saveNote", {
@@ -48,7 +48,7 @@ const TipTapEditor = ({ note }: Props) => {
   // Handle streaming AI completion
   const handleCompletion = React.useCallback(async (prompt: string) => {
     if (!editor) return;
-    
+
     try {
       console.log("Starting completion request...");
       setErrorMessage("");
@@ -91,12 +91,12 @@ const TipTapEditor = ({ note }: Props) => {
           console.log(`Chunk ${chunkCount}:`, chunk);
           text += chunk;
           setCompletion(text);
-          
+
           // Insert the chunk into the editor at cursor position
           editor.commands.insertContent(chunk);
         }
       }
-      
+
       console.log("Stream completed. Total chunks:", chunkCount);
     } catch (err: any) {
       console.error("AI completion error:", err);
@@ -111,17 +111,17 @@ const TipTapEditor = ({ note }: Props) => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Check if the editor is focused
       if (!editor.isFocused) return;
-      
+
       if (e.shiftKey && e.key === "A") {
         e.preventDefault();
-        
+
         console.log("Shift+A detected, starting autocomplete...");
-        
+
         const words = editor.getText().split(" ");
         const last30 = words.slice(-30).join(" ");
-        
+
         console.log("Last 30 words:", last30);
-        
+
         handleCompletion(last30);
       }
     };
@@ -129,14 +129,14 @@ const TipTapEditor = ({ note }: Props) => {
     // Add event listener to the editor's DOM element instead of document
     const editorElement = editor.view.dom;
     editorElement.addEventListener("keydown", handleKeyDown);
-    
+
     return () => {
       editorElement.removeEventListener("keydown", handleKeyDown);
     };
   }, [editor, handleCompletion]);
 
   const debouncedEditorState = useDebounce(editorState, 500); // Using 500ms like File 2
-  
+
   // Auto-save when content changes
   React.useEffect(() => {
     // Skip initial render
@@ -145,20 +145,20 @@ const TipTapEditor = ({ note }: Props) => {
       lastSavedContent.current = debouncedEditorState;
       return;
     }
-    
+
     // Skip if content hasn't changed
     if (debouncedEditorState === lastSavedContent.current) {
       return;
     }
-    
+
     // Skip if it's empty or just the default heading
     if (debouncedEditorState === "" || debouncedEditorState === `<h1>${note.name}</h1>`) {
       return;
     }
-    
+
     console.log("Saving note:", debouncedEditorState);
     lastSavedContent.current = debouncedEditorState;
-    
+
     saveNote.mutate(debouncedEditorState, {
       onSuccess: (data) => {
         console.log("success update!", data);
@@ -188,7 +188,7 @@ const TipTapEditor = ({ note }: Props) => {
 
       <div className="h-4"></div>
       <span className="text-sm">
-        Tip: Press{" "}
+        Press{" "}
         <kbd className="px-2 py-1.5 text-xs font-semibold text-gray-800 bg-gray-100 border border-gray-200 rounded-lg">
           Shift + A
         </kbd>{" "}
