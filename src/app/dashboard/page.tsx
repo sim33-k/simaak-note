@@ -2,15 +2,25 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import CreateNoteDialog from '@/components/CreateNoteDialog'
 import { UserButton } from '@clerk/nextjs'
+import { currentUser } from '@clerk/nextjs/server'
 import { ArrowLeft, Search } from 'lucide-react'
 import Link from 'next/link'
 import React from 'react'
+import { db } from '@/lib/db'
+import { notes as notesTable } from '@/lib/db/schema'
+import { eq } from 'drizzle-orm'
+import Image from 'next/image'
 
 type Props = {}
 
-const DashboardPage = (props: Props) => {
-  // Mock data - replace with actual notes data
-  const notes = [] // This will be populated from your database
+const DashboardPage = async (props: Props) => {
+  const user = await currentUser()
+  
+  if (!user) {
+    return null
+  }
+
+  const notes = await db.select().from(notesTable).where(eq(notesTable.userId, user.id))
 
   return (
     <div className='min-h-screen bg-gradient-to-br from-gray-50 to-gray-100'>
@@ -53,26 +63,38 @@ const DashboardPage = (props: Props) => {
         </div>
 
         {/* Notes Grid */}
-        {notes.length === 0 ? (
-          <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6'>
-            <CreateNoteDialog />
-          </div>
-        ) : (
-          <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6'>
-            <CreateNoteDialog />
-            {/* Note cards would go here */}
-            {/* Example note card structure:
-            <div className='bg-white rounded-lg border border-gray-200 p-6 hover:shadow-md transition-shadow cursor-pointer'>
-              <h3 className='font-medium text-gray-900 mb-2'>Note Title</h3>
-              <p className='text-sm text-gray-500 mb-4'>Last edited 2 hours ago</p>
-              <div className='flex justify-between items-center'>
-                <span className='text-xs text-gray-400'>Created 3 days ago</span>
-                <Button variant="ghost" size="sm">Open</Button>
+        <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6'>
+          <CreateNoteDialog />
+          {notes.map((note) => (
+            <Link key={note.id} href={`/notebook/${note.id}`}>
+              <div className='bg-white rounded-lg border border-gray-200 overflow-hidden hover:shadow-md transition-shadow cursor-pointer h-full flex flex-col'>
+                {note.imageUrl && (
+                  <div className='relative w-full h-32 bg-gray-100'>
+                    <Image 
+                      src={note.imageUrl} 
+                      alt={note.name}
+                      fill
+                      className='object-cover'
+                    />
+                  </div>
+                )}
+                <div className='p-4 flex-1 flex flex-col'>
+                  <h3 className='font-medium text-gray-900 mb-2 line-clamp-2'>{note.name}</h3>
+                  <p className='text-sm text-gray-500 mb-4'>
+                    {new Date(note.createdAt).toLocaleDateString('en-US', { 
+                      month: 'short', 
+                      day: 'numeric',
+                      year: 'numeric'
+                    })}
+                  </p>
+                  <div className='mt-auto'>
+                    <Button variant="ghost" size="sm" className='w-full'>Open</Button>
+                  </div>
+                </div>
               </div>
-            </div>
-            */}
-          </div>
-        )}
+            </Link>
+          ))}
+        </div>
 
         {/* Quick Actions */}
         {notes.length > 0 && (
