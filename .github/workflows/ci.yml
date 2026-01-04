@@ -18,3 +18,11 @@ jobs:
 
       - run: npm ci
       - run: npm run build
+
+    # Saving build output as artifact
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: nextjs-build
+          path: .next/
