@@ -66,10 +66,10 @@ export async function generateImage(image_description: string) {
         const image_url = response.data[0].url
         return image_url as string
     } catch (error: unknown) {
-        const err = error as any;
-        console.error('Error generating image:', err);
+        console.error('Error generating image:', error);
         
         // Check if it's a billing limit error
+        const err = error as { code?: string; status?: number };
         if (err.code === 'billing_hard_limit_reached' || err.status === 400) {
             console.log('Billing limit reached, using fallback placeholder image');
             // Use Picsum Photos for random placeholder images

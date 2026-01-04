@@ -75,7 +75,6 @@ const TipTapEditor = ({ note }: Props) => {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let done = false;
-      let text = "";
       let chunkCount = 0;
 
       while (!done) {
@@ -85,7 +84,6 @@ const TipTapEditor = ({ note }: Props) => {
           chunkCount++;
           const chunk = decoder.decode(value);
           console.log(`Chunk ${chunkCount}:`, chunk);
-          text += chunk;
 
           // Insert the chunk into the editor at cursor position
           editor.commands.insertContent(chunk);
