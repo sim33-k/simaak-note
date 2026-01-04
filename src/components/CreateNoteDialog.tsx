@@ -8,7 +8,7 @@ import { useMutation } from '@tanstack/react-query'
 import axios from 'axios'
 import { useRouter } from 'next/navigation'
   
-type Props = {}
+type Props = object
 
 const CreateNoteDialog = (props: Props) => {
     const [input, setInput] = React.useState('')
