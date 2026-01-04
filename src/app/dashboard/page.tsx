@@ -1,5 +1,4 @@
 import { Button } from '@/components/ui/button'
-import { Separator } from '@/components/ui/separator'
 import CreateNoteDialog from '@/components/CreateNoteDialog'
 import { UserButton } from '@clerk/nextjs'
 import { currentUser } from '@clerk/nextjs/server'
@@ -11,7 +10,7 @@ import { notes as notesTable } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import Image from 'next/image'
 
-type Props = {}
+type Props = object
 
 const DashboardPage = async (props: Props) => {
   const user = await currentUser()
