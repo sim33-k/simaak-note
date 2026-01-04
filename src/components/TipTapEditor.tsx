@@ -2,7 +2,6 @@
 import React from "react";
 import { EditorContent, useEditor } from "@tiptap/react";
 import { StarterKit } from "@tiptap/starter-kit";
-import Text from "@tiptap/extension-text";
 import TipTapMenuBar from "./TipTapMenuBar";
 import { Button } from "./ui/button";
 import { useMutation } from "@tanstack/react-query";
@@ -19,12 +18,10 @@ const TipTapEditor = ({ note }: Props) => {
       : `<h1>${note.name}</h1>`
   );
 
-  const [completion, setCompletion] = React.useState("");
   const [errorMessage, setErrorMessage] = React.useState("");
 
   const hasInitialized = React.useRef(false);
   const lastSavedContent = React.useRef(editorState);
-  const lastCompletion = React.useRef("");
 
   const saveNote = useMutation({
     mutationFn: async (content: string) => {
@@ -52,7 +49,6 @@ const TipTapEditor = ({ note }: Props) => {
     try {
       console.log("Starting completion request...");
       setErrorMessage("");
-      setCompletion("");
 
       const response = await fetch("/api/completion", {
         method: "POST",
@@ -90,7 +86,6 @@ const TipTapEditor = ({ note }: Props) => {
           const chunk = decoder.decode(value);
           console.log(`Chunk ${chunkCount}:`, chunk);
           text += chunk;
-          setCompletion(text);
 
           // Insert the chunk into the editor at cursor position
           editor.commands.insertContent(chunk);
@@ -98,9 +93,10 @@ const TipTapEditor = ({ note }: Props) => {
       }
 
       console.log("Stream completed. Total chunks:", chunkCount);
-    } catch (err: any) {
-      console.error("AI completion error:", err);
-      setErrorMessage(err.message || "Unknown error");
+    } catch (err: unknown) {
+      const error = err as Error;
+      console.error("AI completion error:", error);
+      setErrorMessage(error.message || "Unknown error");
     }
   }, [editor]);
 
