@@ -1,3 +1,4 @@
+# Trigger test
 name: CI
 
 on:
