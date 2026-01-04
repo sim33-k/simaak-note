@@ -5,10 +5,10 @@ on:
   push:
     branches: [main]
 
-  jobs:
-    builds:
-      runs-on: ubuntu-latest
-    steps:
+jobs:  
+  builds:  
+    runs-on: ubuntu-latest
+    steps:  
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
@@ -17,4 +17,3 @@ on:
 
       - run: npm ci
       - run: npm run build
-
