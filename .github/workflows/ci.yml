@@ -32,4 +32,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: nextjs-build
-          path: ${{ github.workspace }}/.next/
+          path: .next/**/*
+          include-hidden-files: true
