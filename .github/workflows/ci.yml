@@ -24,21 +24,8 @@ jobs:
       - run: npm ci
       - run: npm run build
 
-      - name: Check build output
-        run: |
-          echo "Listing root directory:"
-          ls -la
-          echo "Checking if .next exists:"
-          if [ -d ".next" ]; then
-            echo ".next directory exists"
-            ls -la .next/
-          else
-            echo ".next directory NOT found"
-          fi
-
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: nextjs-build
           path: .next/
-          if-no-files-found: warn
